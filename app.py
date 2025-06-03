@@ -11,14 +11,24 @@ if st.button("Submit") and question:
         "Content-Type": "application/json"
     }
 
+    # Match input schema
+    data = {
+        "messages": [
+            {"role": "user", "content": question}
+        ]
+    }
+
+    # Send to Databricks endpoint
     response = requests.post(
         st.secrets["ENDPOINT_URL"],
         headers=headers,
-        json={"inputs": {"question": question}}
+        json=data
     )
 
+    # Display answer if response is successful
     if response.status_code == 200:
         result = response.json()
-        st.write("Answer:", result.get("answer", result))
+        st.write("Answer:")
+        st.write(result.get("content", "No content returned"))
     else:
         st.error(f"Error {response.status_code}: {response.text}")
