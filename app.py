@@ -2,47 +2,66 @@ import streamlit as st
 import requests
 
 st.set_page_config(page_title="Field Staff Chatbot")
-st.title("Secure Field Staff Chatbot")
+st.title("Field Staff Chatbot v3")
 
-# Input box for the user
-question = st.text_input("Ask a question:")
+# Initialize session state for chat history
+if "messages" not in st.session_state:
+    st.session_state.messages = [
+        {"role": "assistant", "content": "Hi there! I'm your Field Staff Chatbot. How can I help you today?"}
+    ]
 
-# On submit, send the request to the Databricks endpoint
-if st.button("Submit") and question:
-    # Prepare headers for Databricks API
-    headers = {
-        "Authorization": f"Bearer {st.secrets['DATABRICKS_PAT']}",
-        "Content-Type": "application/json"
-    }
+# Display chat history
+for msg in st.session_state.messages:
+    with st.chat_message(msg["role"]):
+        st.markdown(msg["content"])
 
-    # Format input for MLflow model serving (MUST be dataframe_records)
+# Handle user input
+if user_input := st.chat_input("Type your question here..."):
+    # Add user's message to history
+    st.session_state.messages.append({"role": "user", "content": user_input})
+    with st.chat_message("user"):
+        st.markdown(user_input)
+
+    # Prepare payload to match your Databricks format
     payload = {
         "dataframe_records": [
             {
-                "messages": [
-                    {"role": "user", "content": question}
-                ],
+                "messages": st.session_state.messages,
                 "max_tokens": 128
             }
         ]
     }
 
+    # Prepare request headers
+    headers = {
+        "Authorization": f"Bearer {st.secrets['DATABRICKS_PAT']}",
+        "Content-Type": "application/json"
+    }
+
+    # Send POST request to your Databricks endpoint
     try:
-        # Send POST request to Databricks endpoint
         response = requests.post(
             st.secrets["ENDPOINT_URL"],
             headers=headers,
             json=payload
         )
+        response.raise_for_status()
+        result = response.json()
 
-        # If the response is successful, show the result
-        if response.status_code == 200:
-            result = response.json()
-            st.write("Raw response from Databricks:")
-            st.json(result)  # Display the full JSON so you can inspect it
-
+        # Extract the assistant's reply based on supported formats
+        if "messages" in result:
+            reply = result["messages"][-1]["content"]
+        elif "choices" in result:
+            reply = result["choices"][0]["message"]["content"]
+        elif "predictions" in result:
+            reply = str(result["predictions"][0])
         else:
-            st.error(f"Error {response.status_code}: {response.text}")
+            reply = f"Unrecognized response format: {result}"
 
     except Exception as e:
-        st.error(f"Request failed: {e}")
+        reply = f"❌ Error: {e}"
+
+    # Add assistant response to chat
+    st.session_state.messages.append({"role": "assistant", "content": reply})
+    with st.chat_message("assistant"):
+        st.markdown(reply)
