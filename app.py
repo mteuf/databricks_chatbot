@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 
-st.set_page_config(page_title="Secure Field Staff Chatbot")
+st.set_page_config(page_title="Secure Field Staff Chatbot v2")
 st.title("Secure Field Staff Chatbot")
 
 question = st.text_input("Ask a question:")
