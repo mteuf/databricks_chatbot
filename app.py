@@ -12,24 +12,24 @@ if st.button("Submit") and question:
         "Content-Type": "application/json"
     }
 
-    # Send raw messages array (not nested in inputs/data/etc.)
-    data = {
+    payload = {
         "messages": [
             {"role": "user", "content": question}
-        ]
+        ],
+        "max_tokens": 128
     }
 
     try:
         response = requests.post(
             st.secrets["ENDPOINT_URL"],
             headers=headers,
-            json=data
+            json=payload
         )
 
         if response.status_code == 200:
             result = response.json()
 
-            # Safely extract 'content' field
+            # result is expected to be like: {"role": "assistant", "content": "..."}
             if isinstance(result, dict) and "content" in result:
                 st.write("Answer:")
                 st.write(result["content"])
