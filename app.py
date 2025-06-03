@@ -32,3 +32,7 @@ if st.button("Submit") and question:
             st.json(result)  # <–– just dump the full JSON
 
         else:
+            st.error(f"Error {response.status_code}: {response.text}")
+
+    except Exception as e:
+        st.error(f"Request failed: {e}")
