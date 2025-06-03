@@ -12,6 +12,7 @@ if st.button("Submit") and question:
         "Content-Type": "application/json"
     }
 
+    # Send raw messages array (not nested in inputs/data/etc.)
     data = {
         "messages": [
             {"role": "user", "content": question}
@@ -28,8 +29,13 @@ if st.button("Submit") and question:
         if response.status_code == 200:
             result = response.json()
 
-            st.write("Raw response:")
-            st.json(result)  # <–– just dump the full JSON
+            # Safely extract 'content' field
+            if isinstance(result, dict) and "content" in result:
+                st.write("Answer:")
+                st.write(result["content"])
+            else:
+                st.write("Raw response:")
+                st.json(result)
 
         else:
             st.error(f"Error {response.status_code}: {response.text}")
