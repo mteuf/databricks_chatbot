@@ -1,28 +1,27 @@
 import streamlit as st
 import requests
 
-st.set_page_config(page_title="Field Staff Chatbot")
+st.set_page_config(page_title="Field Staff Chatbot v3")
 st.title("Field Staff Chatbot v3")
 
-# Initialize session state for chat history
+# Initialize message history
 if "messages" not in st.session_state:
     st.session_state.messages = [
         {"role": "assistant", "content": "Hi there! I'm your Field Staff Chatbot. How can I help you today?"}
     ]
 
-# Display chat history
+# Display previous messages
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# Handle user input
+# Handle new user input
 if user_input := st.chat_input("Type your question here..."):
-    # Add user's message to history
     st.session_state.messages.append({"role": "user", "content": user_input})
     with st.chat_message("user"):
         st.markdown(user_input)
 
-    # Prepare payload to match your Databricks format
+    # Prepare payload in MLflow format
     payload = {
         "dataframe_records": [
             {
@@ -32,13 +31,11 @@ if user_input := st.chat_input("Type your question here..."):
         ]
     }
 
-    # Prepare request headers
     headers = {
         "Authorization": f"Bearer {st.secrets['DATABRICKS_PAT']}",
         "Content-Type": "application/json"
     }
 
-    # Send POST request to your Databricks endpoint
     try:
         response = requests.post(
             st.secrets["ENDPOINT_URL"],
@@ -46,22 +43,37 @@ if user_input := st.chat_input("Type your question here..."):
             json=payload
         )
         response.raise_for_status()
-        result = response.json()
 
-        # Extract the assistant's reply based on supported formats
-        if "messages" in result:
-            reply = result["messages"][-1]["content"]
-        elif "choices" in result:
-            reply = result["choices"][0]["message"]["content"]
-        elif "predictions" in result:
-            reply = str(result["predictions"][0])
+        try:
+            result = response.json()
+        except Exception:
+            reply = "❌ Could not decode JSON from Databricks."
+            st.session_state.messages.append({"role": "assistant", "content": reply})
+            with st.chat_message("assistant"):
+                st.markdown(reply)
+            raise
+
+        # Show raw response for debugging
+        st.write("Raw Databricks response:")
+        st.json(result)
+
+        # Handle known response formats
+        if isinstance(result, dict):
+            if "messages" in result and isinstance(result["messages"], list):
+                reply = result["messages"][-1]["content"]
+            elif "choices" in result and result["choices"]:
+                reply = result["choices"][0]["message"]["content"]
+            elif "predictions" in result and result["predictions"]:
+                reply = str(result["predictions"][0])
+            else:
+                reply = f"⚠️ Unrecognized format: {result}"
         else:
-            reply = f"Unrecognized response format: {result}"
+            reply = f"⚠️ Unexpected non-dict result: {result}"
 
     except Exception as e:
         reply = f"❌ Error: {e}"
 
-    # Add assistant response to chat
+    # Show and store assistant reply
     st.session_state.messages.append({"role": "assistant", "content": reply})
     with st.chat_message("assistant"):
         st.markdown(reply)
