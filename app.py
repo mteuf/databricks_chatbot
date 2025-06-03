@@ -28,18 +28,7 @@ if st.button("Submit") and question:
         if response.status_code == 200:
             result = response.json()
 
-            if isinstance(result, list) and len(result) > 0:
-                answer = result[0].get("content", "No content in response")
-            elif isinstance(result, dict) and "content" in result:
-                answer = result["content"]
-            else:
-                answer = "Unexpected response format."
-
-            st.write("Answer:")
-            st.write(answer)
+            st.write("Raw response:")
+            st.json(result)  # <–– just dump the full JSON
 
         else:
-            st.error(f"Error {response.status_code}: {response.text}")
-
-    except Exception as e:
-        st.error(f"Request failed: {e}")
