@@ -1,7 +1,7 @@
 import streamlit as st
 import requests
 
-st.set_page_config(page_title="Field Staff Chatbot v3")
+st.set_page_config(page_title="Field Staff Chatbot v4")
 st.title("Field Staff Chatbot v3")
 
 # Initialize message history
