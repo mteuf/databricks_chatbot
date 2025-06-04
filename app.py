@@ -1,10 +1,10 @@
 import streamlit as st
 import requests
 
-st.set_page_config(page_title="Field Staff Chatbot")
-st.title("Field Staff Chatbot v5")
+st.set_page_config(page_title="Field Staff Chatbot Debug")
+st.title("Field Staff Chatbot v3 (Debug Mode)")
 
-# Initialize chat history
+# Initialize message history
 if "messages" not in st.session_state:
     st.session_state.messages = [
         {"role": "assistant", "content": "Hi there! I'm your Field Staff Chatbot. How can I help you today?"}
@@ -15,12 +15,13 @@ for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# New input
-if user_input := st.chat_input("Type your question here..."):
+# Input box
+if user_input := st.chat_input("Ask a question..."):
     st.session_state.messages.append({"role": "user", "content": user_input})
     with st.chat_message("user"):
         st.markdown(user_input)
 
+    # Prepare payload in expected format
     payload = {
         "messages": st.session_state.messages
     }
@@ -30,14 +31,27 @@ if user_input := st.chat_input("Type your question here..."):
         "Content-Type": "application/json"
     }
 
+    # 🔍 Log the outgoing request
+    st.write("🔁 Sending request to Databricks endpoint...")
+    st.code(f"POST {st.secrets['ENDPOINT_URL']}")
+    st.write("Payload:")
+    st.json(payload)
+
     try:
         response = requests.post(
-            st.secrets["ENDPOINT_URL"],
+            url=st.secrets["ENDPOINT_URL"],
             headers=headers,
-            json=payload
+            json=payload,
+            timeout=10  # in seconds
         )
-        response.raise_for_status()
 
+        # 🔍 Log the response
+        st.write("✅ Response received.")
+        st.code(f"Status Code: {response.status_code}")
+        st.write("Raw response text:")
+        st.text(response.text)
+
+        # Try decoding as JSON, fallback to plain text
         try:
             result = response.json()
             if isinstance(result, str):
@@ -45,12 +59,12 @@ if user_input := st.chat_input("Type your question here..."):
             else:
                 reply = f"⚠️ Unexpected format: {result}"
         except Exception:
-            reply = response.text  # fallback if .json() fails
+            reply = response.text or "⚠️ Empty response from server."
 
-    except Exception as e:
-        reply = f"❌ Error: {e}"
+    except requests.exceptions.RequestException as e:
+        reply = f"❌ Request failed: {e}"
 
-    # Show assistant reply
+    # Add assistant reply to history
     st.session_state.messages.append({"role": "assistant", "content": reply})
     with st.chat_message("assistant"):
         st.markdown(reply)
