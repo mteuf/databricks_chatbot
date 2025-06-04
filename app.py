@@ -4,16 +4,16 @@ import requests
 st.set_page_config(page_title="Field Staff Chatbot")
 st.title("Field Staff Chatbot v3")
 
-# Start with an empty conversation (no assistant intro)
+# Initialize chat history
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Display message history
+# Display chat history
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# Input box
+# Handle user input
 if user_input := st.chat_input("Ask a question..."):
     st.session_state.messages.append({"role": "user", "content": user_input})
     with st.chat_message("user"):
@@ -29,12 +29,6 @@ if user_input := st.chat_input("Ask a question..."):
         "Content-Type": "application/json"
     }
 
-    # Debug: Show request
-    st.write("🔁 Sending to Databricks...")
-    st.code(f"POST {st.secrets['ENDPOINT_URL']}")
-    st.write("Payload:")
-    st.json(payload)
-
     try:
         response = requests.post(
             url=st.secrets["ENDPOINT_URL"],
@@ -43,16 +37,16 @@ if user_input := st.chat_input("Ask a question..."):
             timeout=10
         )
 
-        st.success("✅ Response received")
-        st.code(f"Status Code: {response.status_code}")
-        st.write("Raw response:")
-        st.text(response.text)
+        # Uncomment below for debug:
+        # st.success("✅ Response received")
+        # st.code(f"Status Code: {response.status_code}")
+        # st.write("Raw response:")
+        # st.text(response.text)
 
         # Parse known formats
         try:
             result = response.json()
 
-            # OpenAI-style response with choices
             if "choices" in result and isinstance(result["choices"], list):
                 reply = result["choices"][0]["message"]["content"]
 
@@ -71,7 +65,7 @@ if user_input := st.chat_input("Ask a question..."):
     except requests.exceptions.RequestException as e:
         reply = f"❌ Connection error: {e}"
 
-    # Show assistant reply
+    # Add assistant reply to chat
     st.session_state.messages.append({"role": "assistant", "content": reply})
     with st.chat_message("assistant"):
         st.markdown(reply)
