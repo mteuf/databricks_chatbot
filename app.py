@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 
 st.set_page_config(page_title="Field Staff Chatbot")
-st.title("Field Staff Chatbot v3")
+st.title("Field Staff Chatbot")
 
 # Initialize chat history
 if "messages" not in st.session_state:
