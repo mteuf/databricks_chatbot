@@ -19,7 +19,7 @@ if user_input := st.chat_input("Ask a question..."):
     with st.chat_message("user"):
         st.markdown(user_input)
 
-    # Construct payload
+    # Construct payload for your question-answering chain
     payload = {
         "messages": st.session_state.messages
     }
@@ -37,13 +37,6 @@ if user_input := st.chat_input("Ask a question..."):
             timeout=10
         )
 
-        # Uncomment below for debug:
-        # st.success("✅ Response received")
-        # st.code(f"Status Code: {response.status_code}")
-        # st.write("Raw response:")
-        # st.text(response.text)
-
-        # Parse known formats
         try:
             result = response.json()
 
@@ -65,7 +58,36 @@ if user_input := st.chat_input("Ask a question..."):
     except requests.exceptions.RequestException as e:
         reply = f"❌ Connection error: {e}"
 
-    # Add assistant reply to chat
+    # Show assistant reply
     st.session_state.messages.append({"role": "assistant", "content": reply})
     with st.chat_message("assistant"):
         st.markdown(reply)
+
+        # -------------
+        # TEST FEEDBACK WRITEBACK
+        # -------------
+        feedback_payload = {
+            "columns": ["question", "answer", "score", "comment"],
+            "data": [[
+                user_input,
+                reply,
+                "5",
+                "streamlit test feedback"
+            ]]
+        }
+
+        try:
+            feedback_response = requests.post(
+                "https://adb-439895488707306.6.azuredatabricks.net/serving-endpoints/fieldstaff-feedback-endpoint/invocations",
+                headers={
+                    "Authorization": f"Bearer {st.secrets['DATABRICKS_PAT']}",
+                    "Content-Type": "application/json"
+                },
+                json=feedback_payload,
+                timeout=10
+            )
+            st.success(f"✅ Feedback sent. Status code: {feedback_response.status_code}")
+            st.code(feedback_response.text)
+
+        except Exception as e:
+            st.warning(f"⚠️ Could not send feedback: {e}")
