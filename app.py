@@ -80,7 +80,7 @@ if user_input := st.chat_input("Ask a question..."):
 
         try:
             feedback_response = requests.post(
-                "https://adb-439895488707306.6.azuredatabricks.net/serving-endpoints/fieldstaff-feedback-endpoint_v4/invocations",
+                "https://adb-439895488707306.6.azuredatabricks.net/serving-endpoints/fieldstaff-feedback-endpoint_v5/invocations",
                 headers={
                     "Authorization": f"Bearer {st.secrets['DATABRICKS_PAT']}",
                     "Content-Type": "application/json"
