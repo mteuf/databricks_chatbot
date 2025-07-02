@@ -67,13 +67,15 @@ if user_input := st.chat_input("Ask a question..."):
         # TEST FEEDBACK WRITEBACK
         # -------------
         feedback_payload = {
-            "columns": ["question", "answer", "score", "comment"],
-            "data": [[
-                user_input,
-                reply,
-                "5",
-                "streamlit test feedback"
-            ]]
+            "dataframe_split": {
+                "columns": ["question", "answer", "score", "comment"],
+                "data": [[
+                    user_input,
+                    reply,
+                    "5",
+                    "streamlit test feedback"
+                ]]
+            }
         }
 
         try:
