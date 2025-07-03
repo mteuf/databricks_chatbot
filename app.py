@@ -82,8 +82,8 @@ if st.session_state.messages:
                         )
                         cursor = conn.cursor()
                         cursor.execute("""
-                            INSERT INTO default.feedback
-                            (question, answer, score, comment, timestamp, category, user)
+                            INSERT INTO ai_squad_np.default.feedback
+                            (question, answer, score, comment, timestamp, user, category)
                             VALUES (?, ?, ?, ?, ?, ?, ?)
                         """, (
                             question,
@@ -121,8 +121,8 @@ if st.session_state.messages:
                                 )
                                 cursor = conn.cursor()
                                 cursor.execute("""
-                                    INSERT INTO default.feedback
-                                    (question, answer, score, comment, timestamp, category, user)
+                                    INSERT INTO ai_squad_np.default.feedback
+                                    (question, answer, score, comment, timestamp, category, user, category)
                                     VALUES (?, ?, ?, ?, ?, ?, ?)
                                 """, (
                                     question,
@@ -130,8 +130,8 @@ if st.session_state.messages:
                                     "thumbs_down",
                                     feedback_comment,
                                     datetime.now().isoformat(),
+                                    "",
                                     feedback_category,
-                                    ""
                                 ))
                                 cursor.close()
                                 conn.close()
