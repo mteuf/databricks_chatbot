@@ -102,11 +102,11 @@ if st.session_state.messages:
                         conn.close()
                         st.session_state[feedback_key] = "thumbs_up"
                         st.toast("✅ Your positive feedback was recorded!")
-                        st.success("Thanks for your feedback!")
+                        st.experimental_rerun()
                     except Exception as e:
                         st.warning(f"⚠️ Could not store thumbs up feedback: {e}")
 
-                # thumbs down: set pending flag to keep form visible
+                # thumbs down: set pending flag
                 if thumbs_down:
                     st.session_state.pending_feedback = idx
 
@@ -147,7 +147,7 @@ if st.session_state.messages:
                             st.session_state[feedback_key] = "thumbs_down"
                             st.session_state.pending_feedback = None
                             st.toast("✅ Your feedback was recorded!")
-                            st.success("Thanks — your feedback will help us improve.")
+                            st.experimental_rerun()
                         except Exception as e:
                             st.warning(f"⚠️ Could not store thumbs down feedback: {e}")
 
