@@ -149,3 +149,7 @@ if st.session_state.messages:
                             st.toast("✅ Your feedback was recorded!")
                             st.success("Thanks — your feedback will help us improve.")
                         except Exception as e:
+                            st.warning(f"⚠️ Could not store thumbs down feedback: {e}")
+
+            elif feedback_status in ["thumbs_up", "thumbs_down"]:
+                st.success("🎉 Thanks for your feedback!")
