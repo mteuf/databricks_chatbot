@@ -92,7 +92,7 @@ if "latest_reply" in st.session_state and "latest_question" in st.session_state:
                 cursor = conn.cursor()
 
                 cursor.execute("""
-                    INSERT INTO default.feedback
+                    INSERT INTO ai_squad_np.default.feedback
                     (question, answer, score, comment, timestamp)
                     VALUES (?, ?, ?, ?, ?)
                 """, (
