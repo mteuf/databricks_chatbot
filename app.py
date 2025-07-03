@@ -2,16 +2,45 @@ import streamlit as st
 import requests
 from datetime import datetime
 import databricks.sql
+import threading
 
 st.set_page_config(page_title="Field Staff Chatbot")
 st.title("Field Staff Chatbot")
 
-# Initialize chat history1
+# Initialize chat history
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
 if "pending_feedback" not in st.session_state:
     st.session_state.pending_feedback = None
+
+# Function to store feedback in a background thread
+def store_feedback(question, answer, score, comment, category):
+    try:
+        conn = databricks.sql.connect(
+            server_hostname=st.secrets["DATABRICKS_SERVER_HOSTNAME"],
+            http_path=st.secrets["DATABRICKS_HTTP_PATH"],
+            access_token=st.secrets["DATABRICKS_PAT"]
+        )
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO ai_squad_np.default.feedback
+            (question, answer, score, comment, timestamp, category, user)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        """, (
+            question,
+            answer,
+            score,
+            comment,
+            datetime.now().isoformat(),
+            category,
+            ""
+        ))
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        # Log to console instead of streamlit, so UI does not block
+        print(f"⚠️ Could not store feedback: {e}")
 
 # Handle user input
 if user_input := st.chat_input("Ask a question..."):
@@ -74,34 +103,15 @@ if st.session_state.messages:
                 thumbs_down = col2.button("👎 No", key=f"thumbs_down_{idx}")
 
                 if thumbs_up:
-                    # immediately update session
                     st.session_state[feedback_key] = "thumbs_up"
                     just_submitted_feedback = True
-                    try:
-                        conn = databricks.sql.connect(
-                            server_hostname=st.secrets["DATABRICKS_SERVER_HOSTNAME"],
-                            http_path=st.secrets["DATABRICKS_HTTP_PATH"],
-                            access_token=st.secrets["DATABRICKS_PAT"]
-                        )
-                        cursor = conn.cursor()
-                        cursor.execute("""
-                            INSERT INTO ai_squad_np.default.feedback
-                            (question, answer, score, comment, timestamp, category, user)
-                            VALUES (?, ?, ?, ?, ?, ?, ?)
-                        """, (
-                            question,
-                            msg["content"],
-                            "thumbs_up",
-                            "",
-                            datetime.now().isoformat(),
-                            "",
-                            ""
-                        ))
-                        cursor.close()
-                        conn.close()
-                        st.toast("✅ Your positive feedback was recorded!")
-                    except Exception as e:
-                        st.warning(f"⚠️ Could not store thumbs up feedback: {e}")
+                    st.toast("✅ Your positive feedback was recorded!")
+
+                    # fire-and-forget
+                    threading.Thread(
+                        target=store_feedback,
+                        args=(question, msg["content"], "thumbs_up", "", "")
+                    ).start()
 
                 if thumbs_down:
                     st.session_state.pending_feedback = idx
@@ -118,35 +128,16 @@ if st.session_state.messages:
                     submitted_down = st.form_submit_button("Submit Feedback 👎")
 
                     if submitted_down:
-                        # set session state immediately for instant thank-you
                         st.session_state[feedback_key] = "thumbs_down"
                         st.session_state.pending_feedback = None
                         just_submitted_feedback = True
-                        try:
-                            conn = databricks.sql.connect(
-                                server_hostname=st.secrets["DATABRICKS_SERVER_HOSTNAME"],
-                                http_path=st.secrets["DATABRICKS_HTTP_PATH"],
-                                access_token=st.secrets["DATABRICKS_PAT"]
-                            )
-                            cursor = conn.cursor()
-                            cursor.execute("""
-                                INSERT INTO ai_squad_np.default.feedback
-                                (question, answer, score, comment, timestamp, category, user)
-                                VALUES (?, ?, ?, ?, ?, ?, ?)
-                            """, (
-                                question,
-                                msg["content"],
-                                "thumbs_down",
-                                feedback_comment,
-                                datetime.now().isoformat(),
-                                feedback_category,
-                                ""
-                            ))
-                            cursor.close()
-                            conn.close()
-                            st.toast("✅ Your feedback was recorded!")
-                        except Exception as e:
-                            st.warning(f"⚠️ Could not store thumbs down feedback: {e}")
+                        st.toast("✅ Your feedback was recorded!")
+
+                        # fire-and-forget
+                        threading.Thread(
+                            target=store_feedback,
+                            args=(question, msg["content"], "thumbs_down", feedback_comment, feedback_category)
+                        ).start()
 
             # Show the thanks either from previous session or *immediately* after submit
             if feedback_status in ["thumbs_up", "thumbs_down"] or just_submitted_feedback:
