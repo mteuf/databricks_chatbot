@@ -74,6 +74,8 @@ if st.session_state.messages:
                 thumbs_down = col2.button("👎 No", key=f"thumbs_down_{idx}")
 
                 if thumbs_up:
+                    # update state immediately
+                    st.session_state[feedback_key] = "thumbs_up"
                     try:
                         conn = databricks.sql.connect(
                             server_hostname=st.secrets["DATABRICKS_SERVER_HOSTNAME"],
@@ -96,7 +98,6 @@ if st.session_state.messages:
                         ))
                         cursor.close()
                         conn.close()
-                        st.session_state[feedback_key] = "thumbs_up"
                         st.toast("✅ Your positive feedback was recorded!")
                     except Exception as e:
                         st.warning(f"⚠️ Could not store thumbs up feedback: {e}")
@@ -114,7 +115,11 @@ if st.session_state.messages:
                     )
                     feedback_comment = st.text_area("What could be better?", key=f"comment_{idx}")
                     submitted_down = st.form_submit_button("Submit Feedback 👎")
+
                     if submitted_down:
+                        # update state immediately so rerun shows thanks
+                        st.session_state[feedback_key] = "thumbs_down"
+                        st.session_state.pending_feedback = None
                         try:
                             conn = databricks.sql.connect(
                                 server_hostname=st.secrets["DATABRICKS_SERVER_HOSTNAME"],
@@ -137,11 +142,10 @@ if st.session_state.messages:
                             ))
                             cursor.close()
                             conn.close()
-                            st.session_state[feedback_key] = "thumbs_down"
-                            st.session_state.pending_feedback = None
                             st.toast("✅ Your feedback was recorded!")
                         except Exception as e:
                             st.warning(f"⚠️ Could not store thumbs down feedback: {e}")
 
             elif feedback_status in ["thumbs_up", "thumbs_down"]:
                 st.success("🎉 Thanks for your feedback!")
+
