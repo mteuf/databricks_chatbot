@@ -65,10 +65,9 @@ if st.session_state.messages:
 
             # unique session flag to track if we got feedback yet
             feedback_key = f"feedback_{idx}"
-            if feedback_key not in st.session_state:
-                st.session_state[feedback_key] = "none"
+            feedback_status = st.session_state.get(feedback_key, "none")
 
-            if st.session_state[feedback_key] == "none":
+            if feedback_status == "none":
                 st.write("Was this answer helpful?")
                 col1, col2 = st.columns(2)
                 thumbs_up = col1.button("👍 Yes", key=f"thumbs_up_{idx}")
@@ -102,8 +101,8 @@ if st.session_state.messages:
                                 ))
                                 cursor.close()
                                 conn.close()
-                                st.success("✅ Thanks for your positive feedback!")
                                 st.session_state[feedback_key] = "thumbs_up"
+                                st.success("✅ Thanks for your positive feedback!")
                             except Exception as e:
                                 st.warning(f"⚠️ Could not store thumbs up feedback: {e}")
 
@@ -142,10 +141,10 @@ if st.session_state.messages:
                                 ))
                                 cursor.close()
                                 conn.close()
-                                st.success("✅ Thanks — your feedback will help us improve.")
                                 st.session_state[feedback_key] = "thumbs_down"
+                                st.success("✅ Thanks — your feedback will help us improve.")
                             except Exception as e:
                                 st.warning(f"⚠️ Could not store thumbs down feedback: {e}")
-            else:
-                st.success("🎉 Thanks for your feedback!")
 
+            elif feedback_status in ["thumbs_up", "thumbs_down"]:
+                st.success("🎉 Thanks for your feedback!")
