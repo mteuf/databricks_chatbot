@@ -1,2 +1,3 @@
 requests
 databricks-sql-connector
+pip install --upgrade streamlit
