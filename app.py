@@ -4,7 +4,7 @@ from datetime import datetime
 import databricks.sql
 import threading
 
-st.set_page_config(page_title="Field Staff Chatbot")
+st.set_page_config(page_title="Field Staff Chatbot 2")
 st.title("Field Staff Chatbot")
 
 # Initialize chat history
@@ -136,7 +136,6 @@ if st.session_state.messages:
                             just_submitted_feedback = True
                 elif st.session_state.get(feedback_key) == "thumbs_up":
                     with st.form(f"thumbs_up_form_{idx}"):
-                        st.subheader("Thanks for the thumbs up! Any extra comments?")
                         feedback_comment = st.text_area("Any additional thoughts?", key=f"comment_{idx}")
                         submitted_up = st.form_submit_button("Submit Feedback 👍")
 
