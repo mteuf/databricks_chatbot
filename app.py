@@ -69,47 +69,90 @@ if user_input := st.chat_input("Ask a question..."):
     st.session_state.latest_question = user_input
     st.session_state.latest_reply = reply
 
-# ------------------------------------
-# ASK FOR FEEDBACK interactively
-# ------------------------------------
-if "latest_reply" in st.session_state and "latest_question" in st.session_state:
-    with st.form(f"feedback_form_{len(st.session_state.messages)}"):
-        st.subheader("Feedback")
-        feedback_score = st.slider("How would you rate this answer?", 1, 5, 5)
-        feedback_comment = st.text_area("Any comments?")
+    # ----------------------------------------
+    # FEEDBACK thumbs up / thumbs down
+    # ----------------------------------------
+    st.write("Was this answer helpful?")
 
-        submitted = st.form_submit_button("Submit Feedback")
+    col1, col2 = st.columns(2)
 
-        if submitted:
+    with col1:
+        thumbs_up = st.button("👍 Yes", key=f"thumbs_up_{len(st.session_state.messages)}")
+
+    with col2:
+        thumbs_down = st.button("👎 No", key=f"thumbs_down_{len(st.session_state.messages)}")
+
+    # thumbs up logic
+    if thumbs_up:
+        user_identity = st.text_input("Optional: your name or email to associate with this feedback")
+        if st.button("Confirm 👍"):
             try:
-                # open connection to Databricks SQL Warehouse
                 conn = databricks.sql.connect(
                     server_hostname=st.secrets["DATABRICKS_SERVER_HOSTNAME"],
                     http_path=st.secrets["DATABRICKS_HTTP_PATH"],
                     access_token=st.secrets["DATABRICKS_PAT"]
                 )
-
                 cursor = conn.cursor()
-
                 cursor.execute("""
-                    INSERT INTO ai_squad_np.default.feedback
-                    (question, answer, score, comment, timestamp)
-                    VALUES (?, ?, ?, ?, ?)
+                    INSERT INTO default.feedback
+                    (question, answer, score, comment, timestamp, category, user)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                 """, (
                     st.session_state.latest_question,
                     st.session_state.latest_reply,
-                    str(feedback_score),
-                    feedback_comment,
-                    datetime.now().isoformat()
+                    "thumbs_up",
+                    "",
+                    datetime.now().isoformat(),
+                    "",
+                    user_identity
                 ))
-
                 cursor.close()
                 conn.close()
-                st.success("✅ Your feedback was recorded. Thank you!")
-
-                # optional: clear latest after storing
+                st.success("✅ Thanks for your positive feedback!")
                 st.session_state.latest_question = None
                 st.session_state.latest_reply = None
-
             except Exception as e:
-                st.warning(f"⚠️ Could not store feedback in Delta: {e}")
+                st.warning(f"⚠️ Could not store thumbs up feedback: {e}")
+
+    # thumbs down logic
+    if thumbs_down:
+        with st.form(f"thumbs_down_form_{len(st.session_state.messages)}"):
+            st.subheader("Sorry about that — how can we improve?")
+
+            feedback_category = st.selectbox(
+                "What type of issue best describes the problem?",
+                ["inaccurate", "outdated", "too long", "too short", "other"]
+            )
+
+            feedback_comment = st.text_area("What could be better?")
+            user_identity = st.text_input("Your name or email (optional)")
+            submitted = st.form_submit_button("Submit Feedback 👎")
+
+            if submitted:
+                try:
+                    conn = databricks.sql.connect(
+                        server_hostname=st.secrets["DATABRICKS_SERVER_HOSTNAME"],
+                        http_path=st.secrets["DATABRICKS_HTTP_PATH"],
+                        access_token=st.secrets["DATABRICKS_PAT"]
+                    )
+                    cursor = conn.cursor()
+                    cursor.execute("""
+                        INSERT INTO default.feedback
+                        (question, answer, score, comment, timestamp, category, user)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """, (
+                        st.session_state.latest_question,
+                        st.session_state.latest_reply,
+                        "thumbs_down",
+                        feedback_comment,
+                        datetime.now().isoformat(),
+                        feedback_category,
+                        user_identity
+                    ))
+                    cursor.close()
+                    conn.close()
+                    st.success("✅ Thanks — your feedback will help us improve.")
+                    st.session_state.latest_question = None
+                    st.session_state.latest_reply = None
+                except Exception as e:
+                    st.warning(f"⚠️ Could not store thumbs down feedback: {e}")
