@@ -6,7 +6,7 @@ import databricks.sql
 st.set_page_config(page_title="Field Staff Chatbot")
 st.title("Field Staff Chatbot")
 
-# Initialize chat history1
+# Initialize chat history
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
@@ -98,7 +98,6 @@ if st.session_state.messages:
                         conn.close()
                         st.session_state[feedback_key] = "thumbs_up"
                         st.toast("✅ Your positive feedback was recorded!")
-                        st.success("Thanks for your feedback!")
                     except Exception as e:
                         st.warning(f"⚠️ Could not store thumbs up feedback: {e}")
 
@@ -141,7 +140,6 @@ if st.session_state.messages:
                             st.session_state[feedback_key] = "thumbs_down"
                             st.session_state.pending_feedback = None
                             st.toast("✅ Your feedback was recorded!")
-                            st.success("Thanks — your feedback will help us improve.")
                         except Exception as e:
                             st.warning(f"⚠️ Could not store thumbs down feedback: {e}")
 
