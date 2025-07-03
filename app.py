@@ -10,7 +10,6 @@ st.title("Field Staff Chatbot")
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# Track feedback states
 if "pending_feedback" not in st.session_state:
     st.session_state.pending_feedback = None
 
@@ -46,11 +45,12 @@ if user_input := st.chat_input("Ask a question..."):
     except requests.exceptions.RequestException as e:
         reply = f"❌ Connection error: {e}"
 
-    # record assistant reply
     st.session_state.messages.append({"role": "assistant", "content": reply})
 
 # Only process if there are messages
 if st.session_state.messages:
+    just_submitted_feedback = False  # controls immediate thank-you display
+
     for idx, msg in enumerate(st.session_state.messages):
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
@@ -74,8 +74,9 @@ if st.session_state.messages:
                 thumbs_down = col2.button("👎 No", key=f"thumbs_down_{idx}")
 
                 if thumbs_up:
-                    # update state immediately
+                    # immediately update session
                     st.session_state[feedback_key] = "thumbs_up"
+                    just_submitted_feedback = True
                     try:
                         conn = databricks.sql.connect(
                             server_hostname=st.secrets["DATABRICKS_SERVER_HOSTNAME"],
@@ -117,9 +118,10 @@ if st.session_state.messages:
                     submitted_down = st.form_submit_button("Submit Feedback 👎")
 
                     if submitted_down:
-                        # update state immediately so rerun shows thanks
+                        # set session state immediately for instant thank-you
                         st.session_state[feedback_key] = "thumbs_down"
                         st.session_state.pending_feedback = None
+                        just_submitted_feedback = True
                         try:
                             conn = databricks.sql.connect(
                                 server_hostname=st.secrets["DATABRICKS_SERVER_HOSTNAME"],
@@ -146,6 +148,7 @@ if st.session_state.messages:
                         except Exception as e:
                             st.warning(f"⚠️ Could not store thumbs down feedback: {e}")
 
-            elif feedback_status in ["thumbs_up", "thumbs_down"]:
+            # Show the thanks either from previous session or *immediately* after submit
+            if feedback_status in ["thumbs_up", "thumbs_down"] or just_submitted_feedback:
                 st.success("🎉 Thanks for your feedback!")
 
