@@ -17,8 +17,6 @@ if "pending_feedback" not in st.session_state:
 # Handle user input
 if user_input := st.chat_input("Ask a question..."):
     st.session_state.messages.append({"role": "user", "content": user_input})
-    with st.chat_message("user"):
-        st.markdown(user_input)
 
     # send to Databricks model serving
     payload = {"messages": st.session_state.messages}
@@ -70,13 +68,11 @@ if st.session_state.messages:
             feedback_status = st.session_state.get(feedback_key, "none")
 
             if feedback_status == "none":
-                # normal thumbs prompt
                 st.write("Was this answer helpful?")
                 col1, col2 = st.columns(2)
                 thumbs_up = col1.button("👍 Yes", key=f"thumbs_up_{idx}")
                 thumbs_down = col2.button("👎 No", key=f"thumbs_down_{idx}")
 
-                # thumbs up logic
                 if thumbs_up:
                     try:
                         conn = databricks.sql.connect(
@@ -106,11 +102,9 @@ if st.session_state.messages:
                     except Exception as e:
                         st.warning(f"⚠️ Could not store thumbs up feedback: {e}")
 
-                # thumbs down: set pending flag to keep form visible
                 if thumbs_down:
                     st.session_state.pending_feedback = idx
 
-            # thumbs down form if flagged
             if st.session_state.pending_feedback == idx:
                 with st.form(f"thumbs_down_form_{idx}"):
                     st.subheader("Sorry about that — how can we improve?")
