@@ -6,7 +6,7 @@ import databricks.sql
 st.set_page_config(page_title="Field Staff Chatbot")
 st.title("Field Staff Chatbot")
 
-# Initialize chat history
+# Initialize chat history1
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
