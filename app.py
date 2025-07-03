@@ -1,5 +1,7 @@
 import streamlit as st
 import requests
+from datetime import datetime
+import databricks.sql
 
 st.set_page_config(page_title="Field Staff Chatbot")
 st.title("Field Staff Chatbot")
@@ -19,7 +21,7 @@ if user_input := st.chat_input("Ask a question..."):
     with st.chat_message("user"):
         st.markdown(user_input)
 
-    # Construct payload for your question-answering chain
+    # Construct payload for the question-answering chain
     payload = {
         "messages": st.session_state.messages
     }
@@ -34,7 +36,7 @@ if user_input := st.chat_input("Ask a question..."):
             url=st.secrets["ENDPOINT_URL"],
             headers=headers,
             json=payload,
-            timeout=10
+            timeout=20
         )
 
         try:
@@ -63,33 +65,35 @@ if user_input := st.chat_input("Ask a question..."):
     with st.chat_message("assistant"):
         st.markdown(reply)
 
-        # -------------
-        # TEST FEEDBACK WRITEBACK
-        # -------------
-        feedback_payload = {
-            "dataframe_split": {
-                "columns": ["question", "answer", "score", "comment"],
-                "data": [[
-                    user_input,
-                    reply,
-                    "5",
-                    "streamlit test feedback"
-                ]]
-            }
-        }
-
+        # ------------------------------------
+        # FEEDBACK WRITEBACK TO DELTA TABLE
+        # ------------------------------------
         try:
-            feedback_response = requests.post(
-                "https://adb-439895488707306.6.azuredatabricks.net/serving-endpoints/fieldstaff-feedback-endpoint_v5/invocations",
-                headers={
-                    "Authorization": f"Bearer {st.secrets['DATABRICKS_PAT']}",
-                    "Content-Type": "application/json"
-                },
-                json=feedback_payload,
-                timeout=10
+            # open a connection to Databricks SQL Warehouse
+            conn = databricks.sql.connect(
+                server_hostname=st.secrets["DATABRICKS_SERVER_HOSTNAME"],
+                http_path=st.secrets["DATABRICKS_HTTP_PATH"],
+                access_token=st.secrets["DATABRICKS_PAT"]
             )
-            st.success(f"✅ Feedback sent. Status code: {feedback_response.status_code}")
-            st.code(feedback_response.text)
+
+            cursor = conn.cursor()
+
+            # simple hard-coded 5-star test feedback
+            cursor.execute("""
+                INSERT INTO ai_squad_np.default.feedback
+                (question, answer, score, comment, timestamp)
+                VALUES (?, ?, ?, ?, ?)
+            """, (
+                user_input,
+                reply,
+                "5",
+                "streamlit test feedback",
+                datetime.now().isoformat()
+            ))
+
+            cursor.close()
+            conn.close()
+            st.success("✅ Feedback stored in Delta table!")
 
         except Exception as e:
-            st.warning(f"⚠️ Could not send feedback: {e}")
+            st.warning(f"⚠️ Could not store feedback in Delta: {e}")
