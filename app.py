@@ -102,12 +102,6 @@ if st.session_state.messages:
                 if thumbs_up:
                     st.session_state[feedback_key] = "thumbs_up"
                     st.session_state.pending_feedback = idx  # trigger follow-up comment form
-                    just_submitted_feedback = True
-                    st.toast("✅ Your positive feedback was recorded!")
-                    threading.Thread(
-                        target=store_feedback,
-                        args=(question, msg["content"], "thumbs_up", "", "")
-                    ).start()
 
                 if thumbs_down:
                     st.session_state[feedback_key] = "thumbs_down"
@@ -136,7 +130,7 @@ if st.session_state.messages:
                             just_submitted_feedback = True
                 elif st.session_state.get(feedback_key) == "thumbs_up":
                     with st.form(f"thumbs_up_form_{idx}"):
-                        feedback_comment = st.text_area("Any additional thoughts?", key=f"comment_{idx}")
+                        feedback_comment = st.text_area("Please provide any additional thoughts (optional)", key=f"comment_{idx}")
                         submitted_up = st.form_submit_button("Submit Feedback 👍")
 
                         if submitted_up:
