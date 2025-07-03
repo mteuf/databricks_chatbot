@@ -63,7 +63,6 @@ if st.session_state.messages:
                 else ""
             )
 
-            # unique session flag to track if we got feedback yet
             feedback_key = f"feedback_{idx}"
             feedback_status = st.session_state.get(feedback_key, "none")
 
@@ -75,36 +74,32 @@ if st.session_state.messages:
 
                 # thumbs up
                 if thumbs_up:
-                    with st.form(f"thumbs_up_form_{idx}"):
-                        user_identity = st.text_input("Your name or email (optional)", key=f"user_up_{idx}")
-                        submitted_up = st.form_submit_button("Confirm 👍")
-                        if submitted_up:
-                            try:
-                                conn = databricks.sql.connect(
-                                    server_hostname=st.secrets["DATABRICKS_SERVER_HOSTNAME"],
-                                    http_path=st.secrets["DATABRICKS_HTTP_PATH"],
-                                    access_token=st.secrets["DATABRICKS_PAT"]
-                                )
-                                cursor = conn.cursor()
-                                cursor.execute("""
-                                    INSERT INTO default.feedback
-                                    (question, answer, score, comment, timestamp, category, user)
-                                    VALUES (?, ?, ?, ?, ?, ?, ?)
-                                """, (
-                                    question,
-                                    msg["content"],
-                                    "thumbs_up",
-                                    "",
-                                    datetime.now().isoformat(),
-                                    "",
-                                    user_identity
-                                ))
-                                cursor.close()
-                                conn.close()
-                                st.session_state[feedback_key] = "thumbs_up"
-                                st.success("✅ Thanks for your positive feedback!")
-                            except Exception as e:
-                                st.warning(f"⚠️ Could not store thumbs up feedback: {e}")
+                    try:
+                        conn = databricks.sql.connect(
+                            server_hostname=st.secrets["DATABRICKS_SERVER_HOSTNAME"],
+                            http_path=st.secrets["DATABRICKS_HTTP_PATH"],
+                            access_token=st.secrets["DATABRICKS_PAT"]
+                        )
+                        cursor = conn.cursor()
+                        cursor.execute("""
+                            INSERT INTO default.feedback
+                            (question, answer, score, comment, timestamp, category, user)
+                            VALUES (?, ?, ?, ?, ?, ?, ?)
+                        """, (
+                            question,
+                            msg["content"],
+                            "thumbs_up",
+                            "",
+                            datetime.now().isoformat(),
+                            "",
+                            ""
+                        ))
+                        cursor.close()
+                        conn.close()
+                        st.session_state[feedback_key] = "thumbs_up"
+                        st.success("✅ Thanks for your positive feedback!")
+                    except Exception as e:
+                        st.warning(f"⚠️ Could not store thumbs up feedback: {e}")
 
                 # thumbs down
                 if thumbs_down:
@@ -116,7 +111,6 @@ if st.session_state.messages:
                             key=f"category_{idx}"
                         )
                         feedback_comment = st.text_area("What could be better?", key=f"comment_{idx}")
-                        user_identity = st.text_input("Your name or email (optional)", key=f"user_down_{idx}")
                         submitted_down = st.form_submit_button("Submit Feedback 👎")
                         if submitted_down:
                             try:
@@ -137,7 +131,7 @@ if st.session_state.messages:
                                     feedback_comment,
                                     datetime.now().isoformat(),
                                     feedback_category,
-                                    user_identity
+                                    ""
                                 ))
                                 cursor.close()
                                 conn.close()
