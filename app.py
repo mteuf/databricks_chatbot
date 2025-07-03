@@ -65,11 +65,19 @@ if user_input := st.chat_input("Ask a question..."):
     with st.chat_message("assistant"):
         st.markdown(reply)
 
-        # ------------------------------------
-        # FEEDBACK WRITEBACK TO DELTA TABLE
-        # ------------------------------------
+# ------------------------------------
+# ASK FOR FEEDBACK interactively
+# ------------------------------------
+with st.form(f"feedback_form_{len(st.session_state.messages)}"):
+    st.subheader("Feedback")
+    feedback_score = st.slider("How would you rate this answer?", 1, 5, 5)
+    feedback_comment = st.text_area("Any comments?")
+
+    submitted = st.form_submit_button("Submit Feedback")
+
+    if submitted:
         try:
-            # open a connection to Databricks SQL Warehouse
+            # open connection to Databricks SQL Warehouse
             conn = databricks.sql.connect(
                 server_hostname=st.secrets["DATABRICKS_SERVER_HOSTNAME"],
                 http_path=st.secrets["DATABRICKS_HTTP_PATH"],
@@ -78,22 +86,21 @@ if user_input := st.chat_input("Ask a question..."):
 
             cursor = conn.cursor()
 
-            # simple hard-coded 5-star test feedback
             cursor.execute("""
-                INSERT INTO ai_squad_np.default.feedback
+                INSERT INTO default.feedback
                 (question, answer, score, comment, timestamp)
                 VALUES (?, ?, ?, ?, ?)
             """, (
                 user_input,
                 reply,
-                "5",
-                "streamlit test feedback",
+                str(feedback_score),
+                feedback_comment,
                 datetime.now().isoformat()
             ))
 
             cursor.close()
             conn.close()
-            st.success("✅ Feedback stored in Delta table!")
+            st.success("✅ Your feedback was recorded. Thank you!")
 
         except Exception as e:
             st.warning(f"⚠️ Could not store feedback in Delta: {e}")
