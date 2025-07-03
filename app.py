@@ -14,51 +14,13 @@ if "messages" not in st.session_state:
 if "pending_feedback" not in st.session_state:
     st.session_state.pending_feedback = None
 
-# Handle user input
-if user_input := st.chat_input("Ask a question..."):
-    st.session_state.messages.append({"role": "user", "content": user_input})
-    with st.chat_message("user"):
-        st.markdown(user_input)
-
-    # send to Databricks model serving
-    payload = {"messages": st.session_state.messages}
-    headers = {
-        "Authorization": f"Bearer {st.secrets['DATABRICKS_PAT']}",
-        "Content-Type": "application/json"
-    }
-    try:
-        response = requests.post(
-            url=st.secrets["ENDPOINT_URL"],
-            headers=headers,
-            json=payload,
-            timeout=20
-        )
-        try:
-            result = response.json()
-            if "choices" in result and isinstance(result["choices"], list):
-                reply = result["choices"][0]["message"]["content"]
-            elif isinstance(result, str) and result.strip():
-                reply = result
-            elif not result or result == "null":
-                reply = "⚠️ Model returned no content."
-            else:
-                reply = f"⚠️ Unexpected format: {result}"
-        except Exception:
-            reply = response.text or "⚠️ Could not parse model response."
-    except requests.exceptions.RequestException as e:
-        reply = f"❌ Connection error: {e}"
-
-    # record assistant reply
-    st.session_state.messages.append({"role": "assistant", "content": reply})
-
-# Only process if there are messages
+# Only render chat history first (no duplicate)
 if st.session_state.messages:
     for idx, msg in enumerate(st.session_state.messages):
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
         if msg["role"] == "assistant":
-            # get question from previous user message if any
             question_idx = idx - 1
             question = (
                 st.session_state.messages[question_idx]["content"]
@@ -70,13 +32,11 @@ if st.session_state.messages:
             feedback_status = st.session_state.get(feedback_key, "none")
 
             if feedback_status == "none":
-                # normal thumbs prompt
                 st.write("Was this answer helpful?")
                 col1, col2 = st.columns(2)
                 thumbs_up = col1.button("👍 Yes", key=f"thumbs_up_{idx}")
                 thumbs_down = col2.button("👎 No", key=f"thumbs_down_{idx}")
 
-                # thumbs up logic
                 if thumbs_up:
                     try:
                         conn = databricks.sql.connect(
@@ -106,11 +66,9 @@ if st.session_state.messages:
                     except Exception as e:
                         st.warning(f"⚠️ Could not store thumbs up feedback: {e}")
 
-                # thumbs down: set pending flag
                 if thumbs_down:
                     st.session_state.pending_feedback = idx
 
-            # thumbs down form if flagged
             if st.session_state.pending_feedback == idx:
                 with st.form(f"thumbs_down_form_{idx}"):
                     st.subheader("Sorry about that — how can we improve?")
@@ -153,3 +111,36 @@ if st.session_state.messages:
 
             elif feedback_status in ["thumbs_up", "thumbs_down"]:
                 st.success("🎉 Thanks for your feedback!")
+
+# Handle new user input only after displaying history
+if user_input:
+    # send to Databricks model serving
+    payload = {"messages": st.session_state.messages}
+    headers = {
+        "Authorization": f"Bearer {st.secrets['DATABRICKS_PAT']}",
+        "Content-Type": "application/json"
+    }
+    try:
+        response = requests.post(
+            url=st.secrets["ENDPOINT_URL"],
+            headers=headers,
+            json=payload,
+            timeout=20
+        )
+        try:
+            result = response.json()
+            if "choices" in result and isinstance(result["choices"], list):
+                reply = result["choices"][0]["message"]["content"]
+            elif isinstance(result, str) and result.strip():
+                reply = result
+            elif not result or result == "null":
+                reply = "⚠️ Model returned no content."
+            else:
+                reply = f"⚠️ Unexpected format: {result}"
+        except Exception:
+            reply = response.text or "⚠️ Could not parse model response."
+    except requests.exceptions.RequestException as e:
+        reply = f"❌ Connection error: {e}"
+
+    # record assistant reply
+    st.session_state.messages.append({"role": "assistant", "content": reply})
