@@ -65,42 +65,51 @@ if user_input := st.chat_input("Ask a question..."):
     with st.chat_message("assistant"):
         st.markdown(reply)
 
+    # store question/answer for later feedback
+    st.session_state.latest_question = user_input
+    st.session_state.latest_reply = reply
+
 # ------------------------------------
 # ASK FOR FEEDBACK interactively
 # ------------------------------------
-with st.form(f"feedback_form_{len(st.session_state.messages)}"):
-    st.subheader("Feedback")
-    feedback_score = st.slider("How would you rate this answer?", 1, 5, 5)
-    feedback_comment = st.text_area("Any comments?")
+if "latest_reply" in st.session_state and "latest_question" in st.session_state:
+    with st.form(f"feedback_form_{len(st.session_state.messages)}"):
+        st.subheader("Feedback")
+        feedback_score = st.slider("How would you rate this answer?", 1, 5, 5)
+        feedback_comment = st.text_area("Any comments?")
 
-    submitted = st.form_submit_button("Submit Feedback")
+        submitted = st.form_submit_button("Submit Feedback")
 
-    if submitted:
-        try:
-            # open connection to Databricks SQL Warehouse
-            conn = databricks.sql.connect(
-                server_hostname=st.secrets["DATABRICKS_SERVER_HOSTNAME"],
-                http_path=st.secrets["DATABRICKS_HTTP_PATH"],
-                access_token=st.secrets["DATABRICKS_PAT"]
-            )
+        if submitted:
+            try:
+                # open connection to Databricks SQL Warehouse
+                conn = databricks.sql.connect(
+                    server_hostname=st.secrets["DATABRICKS_SERVER_HOSTNAME"],
+                    http_path=st.secrets["DATABRICKS_HTTP_PATH"],
+                    access_token=st.secrets["DATABRICKS_PAT"]
+                )
 
-            cursor = conn.cursor()
+                cursor = conn.cursor()
 
-            cursor.execute("""
-                INSERT INTO default.feedback
-                (question, answer, score, comment, timestamp)
-                VALUES (?, ?, ?, ?, ?)
-            """, (
-                user_input,
-                reply,
-                str(feedback_score),
-                feedback_comment,
-                datetime.now().isoformat()
-            ))
+                cursor.execute("""
+                    INSERT INTO default.feedback
+                    (question, answer, score, comment, timestamp)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (
+                    st.session_state.latest_question,
+                    st.session_state.latest_reply,
+                    str(feedback_score),
+                    feedback_comment,
+                    datetime.now().isoformat()
+                ))
 
-            cursor.close()
-            conn.close()
-            st.success("✅ Your feedback was recorded. Thank you!")
+                cursor.close()
+                conn.close()
+                st.success("✅ Your feedback was recorded. Thank you!")
 
-        except Exception as e:
-            st.warning(f"⚠️ Could not store feedback in Delta: {e}")
+                # optional: clear latest after storing
+                st.session_state.latest_question = None
+                st.session_state.latest_reply = None
+
+            except Exception as e:
+                st.warning(f"⚠️ Could not store feedback in Delta: {e}")
