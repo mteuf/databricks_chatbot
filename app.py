@@ -10,6 +10,10 @@ st.title("Field Staff Chatbot")
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
+# Track feedback states
+if "pending_feedback" not in st.session_state:
+    st.session_state.pending_feedback = None
+
 # Handle user input
 if user_input := st.chat_input("Ask a question..."):
     st.session_state.messages.append({"role": "user", "content": user_input})
@@ -47,32 +51,33 @@ if user_input := st.chat_input("Ask a question..."):
     # record assistant reply
     st.session_state.messages.append({"role": "assistant", "content": reply})
 
-# Display the full conversation + thumbs
-for idx, msg in enumerate(st.session_state.messages):
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+# Only process if there are messages
+if st.session_state.messages:
+    for idx, msg in enumerate(st.session_state.messages):
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
 
-    # only show thumbs for assistant messages
-    if msg["role"] == "assistant":
-        # try to get the user question from the message before this one
-        question_idx = idx - 1
-        question = (
-            st.session_state.messages[question_idx]["content"]
-            if question_idx >= 0 and st.session_state.messages[question_idx]["role"] == "user"
-            else ""
-        )
+        if msg["role"] == "assistant":
+            # get question from previous user message if any
+            question_idx = idx - 1
+            question = (
+                st.session_state.messages[question_idx]["content"]
+                if question_idx >= 0 and st.session_state.messages[question_idx]["role"] == "user"
+                else ""
+            )
 
-        st.write("Was this answer helpful?")
-        col1, col2 = st.columns(2)
-        thumbs_up = col1.button("👍 Yes", key=f"thumbs_up_{idx}")
-        thumbs_down = col2.button("👎 No", key=f"thumbs_down_{idx}")
+            feedback_key = f"feedback_{idx}"
+            feedback_status = st.session_state.get(feedback_key, "none")
 
-        # thumbs up logic
-        if thumbs_up:
-            with st.form(f"thumbs_up_form_{idx}"):
-                user_identity = st.text_input("Your name or email (optional)", key=f"user_up_{idx}")
-                submitted_up = st.form_submit_button("Confirm 👍")
-                if submitted_up:
+            if feedback_status == "none":
+                # normal thumbs prompt
+                st.write("Was this answer helpful?")
+                col1, col2 = st.columns(2)
+                thumbs_up = col1.button("👍 Yes", key=f"thumbs_up_{idx}")
+                thumbs_down = col2.button("👎 No", key=f"thumbs_down_{idx}")
+
+                # thumbs up logic
+                if thumbs_up:
                     try:
                         conn = databricks.sql.connect(
                             server_hostname=st.secrets["DATABRICKS_SERVER_HOSTNAME"],
@@ -81,7 +86,7 @@ for idx, msg in enumerate(st.session_state.messages):
                         )
                         cursor = conn.cursor()
                         cursor.execute("""
-                            INSERT INTO default.feedback
+                            INSERT INTO ai_squad_np.default.feedback
                             (question, answer, score, comment, timestamp, category, user)
                             VALUES (?, ?, ?, ?, ?, ?, ?)
                         """, (
@@ -91,49 +96,60 @@ for idx, msg in enumerate(st.session_state.messages):
                             "",
                             datetime.now().isoformat(),
                             "",
-                            user_identity
+                            ""
                         ))
                         cursor.close()
                         conn.close()
-                        st.success("✅ Thanks for your positive feedback!")
+                        st.session_state[feedback_key] = "thumbs_up"
+                        st.toast("✅ Your positive feedback was recorded!")
+                        st.success("Thanks for your feedback!")
                     except Exception as e:
                         st.warning(f"⚠️ Could not store thumbs up feedback: {e}")
 
-        # thumbs down logic
-        if thumbs_down:
-            with st.form(f"thumbs_down_form_{idx}"):
-                st.subheader("Sorry about that — how can we improve?")
-                feedback_category = st.selectbox(
-                    "What type of issue best describes the problem?",
-                    ["inaccurate", "outdated", "too long", "too short", "other"],
-                    key=f"category_{idx}"
-                )
-                feedback_comment = st.text_area("What could be better?", key=f"comment_{idx}")
-                user_identity = st.text_input("Your name or email (optional)", key=f"user_down_{idx}")
-                submitted_down = st.form_submit_button("Submit Feedback 👎")
-                if submitted_down:
-                    try:
-                        conn = databricks.sql.connect(
-                            server_hostname=st.secrets["DATABRICKS_SERVER_HOSTNAME"],
-                            http_path=st.secrets["DATABRICKS_HTTP_PATH"],
-                            access_token=st.secrets["DATABRICKS_PAT"]
-                        )
-                        cursor = conn.cursor()
-                        cursor.execute("""
-                            INSERT INTO default.feedback
-                            (question, answer, score, comment, timestamp, category, user)
-                            VALUES (?, ?, ?, ?, ?, ?, ?)
-                        """, (
-                            question,
-                            msg["content"],
-                            "thumbs_down",
-                            feedback_comment,
-                            datetime.now().isoformat(),
-                            feedback_category,
-                            user_identity
-                        ))
-                        cursor.close()
-                        conn.close()
-                        st.success("✅ Thanks — your feedback will help us improve.")
-                    except Exception as e:
-                        st.warning(f"⚠️ Could not store thumbs down feedback: {e}")
+                # thumbs down: set pending flag to keep form visible
+                if thumbs_down:
+                    st.session_state.pending_feedback = idx
+
+            # thumbs down form if flagged
+            if st.session_state.pending_feedback == idx:
+                with st.form(f"thumbs_down_form_{idx}"):
+                    st.subheader("Sorry about that — how can we improve?")
+                    feedback_category = st.selectbox(
+                        "What type of issue best describes the problem?",
+                        ["inaccurate", "outdated", "too long", "too short", "other"],
+                        key=f"category_{idx}"
+                    )
+                    feedback_comment = st.text_area("What could be better?", key=f"comment_{idx}")
+                    submitted_down = st.form_submit_button("Submit Feedback 👎")
+                    if submitted_down:
+                        try:
+                            conn = databricks.sql.connect(
+                                server_hostname=st.secrets["DATABRICKS_SERVER_HOSTNAME"],
+                                http_path=st.secrets["DATABRICKS_HTTP_PATH"],
+                                access_token=st.secrets["DATABRICKS_PAT"]
+                            )
+                            cursor = conn.cursor()
+                            cursor.execute("""
+                                INSERT INTO ai_squad_np.default.feedback
+                                (question, answer, score, comment, timestamp, category, user)
+                                VALUES (?, ?, ?, ?, ?, ?, ?)
+                            """, (
+                                question,
+                                msg["content"],
+                                "thumbs_down",
+                                feedback_comment,
+                                datetime.now().isoformat(),
+                                feedback_category,
+                                ""
+                            ))
+                            cursor.close()
+                            conn.close()
+                            st.session_state[feedback_key] = "thumbs_down"
+                            st.session_state.pending_feedback = None
+                            st.toast("✅ Your feedback was recorded!")
+                            st.success("Thanks — your feedback will help us improve.")
+                        except Exception as e:
+                            st.warning(f"⚠️ Could not store thumbs down feedback: {e}")
+
+            elif feedback_status in ["thumbs_up", "thumbs_down"]:
+                st.success("🎉 Thanks for your feedback!")
