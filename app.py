@@ -55,7 +55,7 @@ if user_input := st.chat_input("Ask a question..."):
             url=st.secrets["ENDPOINT_URL"],
             headers=headers,
             json=payload,
-            timeout=60
+            timeout=80
         )
         try:
             result = response.json()
