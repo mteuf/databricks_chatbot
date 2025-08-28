@@ -8,6 +8,23 @@ st.set_page_config(page_title="Field Staff Chatbot")
 st.title("Field Staff Chatbot")
 
 # -----------------------------
+# Typing indicator CSS (inject every run so it always animates)
+# -----------------------------
+TYPING_CSS = """
+<style>
+.typing-dots { display:inline-flex; align-items:center; gap:.35rem; opacity:0.9; }
+.typing-dots .dot {
+  width:.38rem; height:.38rem; border-radius:50%;
+  background: currentColor; opacity:.25; animation: bounce 1s infinite ease-in-out;
+}
+.typing-dots .dot:nth-child(2){ animation-delay:.2s }
+.typing-dots .dot:nth-child(3){ animation-delay:.4s }
+@keyframes bounce { 0%,80%,100%{transform:translateY(0); opacity:.25} 40%{transform:translateY(-.25rem); opacity:1} }
+</style>
+"""
+st.markdown(TYPING_CSS, unsafe_allow_html=True)
+
+# -----------------------------
 # Session state
 # -----------------------------
 if "messages" not in st.session_state:
@@ -137,7 +154,6 @@ def render_feedback_inline(idx: int):
                         daemon=True
                     ).start()
                     st.success("🎉 Thanks for your feedback!")
-
         elif st.session_state.get(feedback_key) == "thumbs_up":
             with st.form(f"thumbs_up_form_{idx}"):
                 feedback_comment = st.text_area("Please provide any additional thoughts (optional)", key=f"comment_{idx}")
@@ -158,7 +174,6 @@ def render_message_with_feedback(idx: int):
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
         if msg["role"] == "assistant":
-            # Reuse inline renderer inside the same bubble
             render_feedback_inline(idx)
 
 # -----------------------------
@@ -166,12 +181,12 @@ def render_message_with_feedback(idx: int):
 # -----------------------------
 user_input = st.chat_input("Ask a question...")
 
-# If new input, append it to history immediately so it renders below
+# Append new user input so it renders at the bottom right away
 if user_input:
     st.session_state.messages.append({"role": "user", "content": user_input})
 
 # -----------------------------
-# Render prior history (everything except a *pending* last user)
+# Render history (everything except a *pending* last user)
 # -----------------------------
 pending_user = None
 messages_to_render = st.session_state.messages
@@ -189,21 +204,31 @@ if pending_user:
         st.markdown(pending_user["content"])
 
 # -----------------------------
-# Stream assistant at the bottom (no duplicate re-render)
+# Stream assistant at the bottom with a single placeholder:
+#   - show bouncing ellipsis only (no "Thinking" text)
+#   - replace with tokens as they arrive (no blank bubble, no duplicates)
 # -----------------------------
 if pending_user:
     with st.chat_message("assistant"):
-        placeholder = st.empty()
+        bubble = st.empty()  # one placeholder for indicator -> streamed content
+
+        # Show animated dots immediately (no label)
+        bubble.markdown(
+            '<div class="typing-dots" role="status" aria-label="Assistant is typing">'
+            '<span class="dot"></span><span class="dot"></span><span class="dot"></span></div>',
+            unsafe_allow_html=True
+        )
+
         full_reply = []
         for token in stream_databricks_chat(st.session_state.messages):
             full_reply.append(token)
-            placeholder.markdown("".join(full_reply))
-        reply_text = "".join(full_reply).strip() or "⚠️ Model returned no content."
-        placeholder.markdown(reply_text)
+            bubble.markdown("".join(full_reply))  # replaces dots on first token
 
-        # Append to history *before* drawing feedback so keys/indices are stable
+        # Finalize content (if no tokens, still replace dots with fallback)
+        reply_text = "".join(full_reply).strip() or "⚠️ Model returned no content."
+        bubble.markdown(reply_text)
+
+        # Persist + inline feedback (no duplicate re-render)
         st.session_state.messages.append({"role": "assistant", "content": reply_text})
         new_idx = len(st.session_state.messages) - 1
-
-        # Draw ONLY feedback controls here to avoid duplicating the content
         render_feedback_inline(new_idx)
